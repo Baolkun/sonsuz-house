@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sonsuz House</title>
+<meta name="description" content="Odada arka planda açık kalacak, hiç tekrar etmeyen, kendi kendine bestelenen sakin house müziği.">
+<meta name="theme-color" content="#14110f">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23e8a87c'/%3E%3Ccircle cx='32' cy='32' r='9' fill='%2314110f'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/stil.css?v=1792986752">
+</head>
+<body>
+<canvas id="bg"></canvas>
+
+<div id="giris" class="giris">
+  <div class="giris-ic">
+    <p class="ust" data-t="tagline">Kendi kendine bestelenen, hiç bitmeyen house</p>
+    <h1>Sonsuz House</h1>
+    <button id="basla" class="basla" data-t="start">Başlat</button>
+    <p class="not" data-t="intro">Her parça o an yazılır; aynısı bir daha çalmaz. Arka planda açık bırak, sekmeyi küçültebilirsin.</p>
+  </div>
+</div>
+
+<main id="ana" class="ana" hidden>
+  <header class="bas">
+    <span class="marka">Sonsuz House</span>
+    <div class="bas-sag">
+      <span id="saat" class="saat-kucuk"></span>
+      <button id="ayarlarBtn" class="ikon" aria-label="Ayarlar" title="Ayarlar">
+        <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <section class="simdi">
+    <p id="tur" class="tur"></p>
+    <h2 id="ad" class="ad">…</h2>
+    <p id="bilgi" class="bilgi"></p>
+    <p id="sonraki" class="sonraki"></p>
+  </section>
+
+  <section class="kontrol">
+    <button id="sevmedim" class="ikon buyuk" title="Sevmedim, geç (D)" aria-label="Sevmedim">
+      <svg viewBox="0 0 24 24"><path d="M7 14V4M7 14l4 6c1.5 0 2.5-1 2.3-2.4L13 14h5.2a2 2 0 0 0 2-2.3l-1.1-6A2 2 0 0 0 17.1 4H7"/></svg>
+    </button>
+    <button id="cal" class="cal" title="Çal / Durdur (boşluk)" aria-label="Çal / Durdur">
+      <svg class="i-dur" viewBox="0 0 24 24"><rect x="7" y="5" width="3.5" height="14" rx="1"/><rect x="13.5" y="5" width="3.5" height="14" rx="1"/></svg>
+      <svg class="i-cal" viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></svg>
+    </button>
+    <button id="sonrakiBtn" class="ikon buyuk" title="Sonraki parçaya geç (N)" aria-label="Sonraki">
+      <svg viewBox="0 0 24 24"><path d="M5 5.5v13l9-6.5zM17 5v14"/></svg>
+    </button>
+    <button id="sevdim" class="ikon buyuk" title="Sevdim (L)" aria-label="Sevdim">
+      <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>
+    </button>
+  </section>
+
+  <section class="kaydiricilar">
+    <label class="kay"><span data-t="vol">Ses</span><input id="ses" type="range" min="0" max="1" step="0.01" value="0.7"></label>
+    <label class="kay"><span data-t="energy">Enerji</span><input id="enerji" type="range" min="0" max="1" step="0.01" value="0.5"><small><i data-t="calm">sakin</i><i data-t="lively">hareketli</i></small></label>
+    <label class="kay"><span data-t="mood">Hava</span><input id="hava" type="range" min="0" max="1" step="0.01" value="0.5"><small><i data-t="dark">loş</i><i data-t="bright">aydınlık</i></small></label>
+  </section>
+
+  <section class="hazir" id="hazir">
+    <button data-p="sabah" data-t="p_sabah">Sabah</button>
+    <button data-p="odak" data-t="p_odak">Odak</button>
+    <button data-p="aksam" data-t="p_aksam">Akşam</button>
+    <button data-p="gece" data-t="p_gece">Gece</button>
+    <button data-p="uyku" data-t="p_uyku">Uyku</button>
+    <button data-p="oto" data-t="p_oto">Saate göre</button>
+  </section>
+
+  <p class="ipucu" data-t="keys">Boşluk çal/durdur · N sonraki · L sevdim · D sevmedim · F ekran modu</p>
+</main>
+
+<aside id="ayarlar" class="ayarlar" hidden>
+  <div class="ay-ic">
+    <div class="ay-bas"><h3 data-t="settings">Ayarlar</h3><button id="kapat" class="ikon" aria-label="Kapat"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+
+    <div class="satir">
+      <div><b data-t="neighbor">Komşu modu</b><small data-t="neighbor_d">Duvardan geçen derin bası keser, ritim yine duyulur.</small></div>
+      <input id="komsu" type="checkbox" class="anahtar">
+    </div>
+
+    <div class="satir dikey">
+      <div><b data-t="amb">Ortam sesi</b><small data-t="amb_d">Müziğin altına hafif bir oda dokusu.</small></div>
+      <div class="secim" id="ortam">
+        <button data-a="yok" data-t="a_yok">Yok</button>
+        <button data-a="plak" data-t="a_plak">Plak</button>
+        <button data-a="yagmur" data-t="a_yagmur">Yağmur</button>
+        <button data-a="deniz" data-t="a_deniz">Deniz</button>
+        <button data-a="somine" data-t="a_somine">Şömine</button>
+      </div>
+      <input id="ortamSes" type="range" min="0" max="1" step="0.01" value="0.4">
+    </div>
+
+    <div class="satir dikey">
+      <div><b data-t="sleep">Uyku zamanlayıcı</b><small data-t="sleep_d">Son üçte birinde ses yavaşça kısılır, sonra durur.</small></div>
+      <div class="secim" id="uyku">
+        <button data-m="0" data-t="off">Kapalı</button>
+        <button data-m="15">15 dk</button>
+        <button data-m="30">30 dk</button>
+        <button data-m="60">60 dk</button>
+        <button data-m="120">2 sa</button>
+      </div>
+      <small id="uykuKalan" class="kalan"></small>
+    </div>
+
+    <div class="satir">
+      <div><b data-t="wake">Ekranı açık tut</b><small data-t="wake_d">Mac uyku moduna geçmesin.</small></div>
+      <input id="uyanik" type="checkbox" class="anahtar">
+    </div>
+
+    <div class="satir">
+      <div><b data-t="screen">Ekran modu</b><small data-t="screen_d">Tam ekran saat ve yavaş renkler.</small></div>
+      <button id="ekranBtn" class="kucuk" data-t="open">Aç</button>
+    </div>
+
+    <div class="satir">
+      <div><b data-t="lang">Dil</b></div>
+      <div class="secim" id="dil"><button data-l="tr">Türkçe</button><button data-l="en">English</button></div>
+    </div>
+
+    <div class="satir">
+      <div><b data-t="taste">Zevk hafızası</b><small data-t="taste_d">Sevdim ve sevmedim düğmeleri sonraki parçaları yönlendirir.</small></div>
+      <button id="sifirla" class="kucuk" data-t="reset">Sıfırla</button>
+    </div>
+
+    <p class="alt"><a href="mailto:lenzy.appp@gmail.com?subject=Sonsuz%20House" data-t="write">Bize yaz</a> · <span data-t="about">Her ses tarayıcında, o anda üretilir. Kayıt ya da örnek dosya yok.</span></p>
+  </div>
+</aside>
+
+<div id="ekran" class="ekran" hidden>
+  <div class="ekran-saat" id="ekranSaat"></div>
+  <div class="ekran-ad" id="ekranAd"></div>
+</div>
+
+<script type="module" src="js/main.js?v=1792986752"></script>
+</body>
+</html>
