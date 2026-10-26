@@ -123,3 +123,40 @@ body.sakin .ad { opacity: .85; }
 .ad, .bilgi, .tur { text-shadow: 0 2px 30px rgba(0,0,0,.45); }
 body.duz { background: radial-gradient(ellipse at 30% 20%, #3a2620, #14110f 70%); }
 body.sakin .ad.soluk { opacity: 0; }
+
+/* ---- sade düzen: ekran görsele kalır, arayüz kenarlarda küçük ---- */
+.ana { position: fixed; inset: 0; max-width: none; margin: 0; padding: 26px 34px 28px; display: flex; flex-direction: column; justify-content: space-between; min-height: 0; }
+.marka { font-size: 15px; opacity: .7; }
+.saat-kucuk { font-size: 13px; }
+.alt-satir { display: flex; justify-content: space-between; align-items: flex-end; gap: 32px; }
+.simdi { flex: 0 1 auto; min-height: 0; padding: 0; text-align: left; max-width: 46vw; }
+.tur { font-size: 10.5px; margin: 0 0 8px; letter-spacing: .16em; opacity: .9; }
+.ad { font-size: clamp(22px, 2.6vw, 34px); line-height: 1.1; }
+.bilgi { font-size: 12px; margin-top: 8px; }
+.sonraki { font-size: 11.5px; margin-top: 4px; }
+.panel { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
+.kontrol { gap: 4px; margin: 0; }
+.ikon.buyuk { width: 38px; height: 38px; }
+.ikon.buyuk svg { width: 18px; height: 18px; }
+.cal { width: 46px; height: 46px; margin: 0 4px; background: rgba(243,235,226,.92); }
+.cal svg { width: 18px; height: 18px; }
+.kaydiricilar { display: flex; gap: 18px; padding: 0; background: none; border: 0; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.kay { flex-direction: row; align-items: center; gap: 8px; font-size: 11px; width: 130px; }
+.kay span { width: 40px; flex-shrink: 0; opacity: .75; }
+input[type=range] { height: 16px; }
+input[type=range]::-webkit-slider-runnable-track { height: 2px; }
+input[type=range]::-webkit-slider-thumb { width: 11px; height: 11px; margin-top: -4.5px; }
+.hazir { margin: 0; gap: 4px; justify-content: flex-end; }
+.hazir button { padding: 4px 10px; font-size: 11px; border-color: rgba(243,235,226,.1); }
+.ipucu { display: none; }
+.ana .ikon:hover { background: rgba(243,235,226,.08); }
+@media (max-width: 760px) {
+  .ana { padding: 18px 16px 20px; }
+  .alt-satir { flex-direction: column; align-items: stretch; }
+  .simdi { max-width: none; }
+  .panel { align-items: stretch; }
+  .kontrol { justify-content: center; }
+  .kaydiricilar { flex-direction: column; gap: 6px; }
+  .kay { width: auto; }
+  .hazir { justify-content: center; flex-wrap: wrap; }
+}

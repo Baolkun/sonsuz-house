@@ -1,8 +1,8 @@
 // Arayüz: düğmeler, kaydırıcılar, hazır ayarlar, medya tuşları, uyku zamanlayıcı, görsel arka plan.
-import { Motor } from './motor.js?v=1792988056';
-import { Akis } from './besteci.js?v=1792988056';
-import { keyName } from './kuram.js?v=1792988056';
-import { Gorsel, trackColors } from './gorsel.js?v=1792988056';
+import { Motor } from './motor.js?v=1792993306';
+import { Akis } from './besteci.js?v=1792993306';
+import { keyName } from './kuram.js?v=1792993306';
+import { Gorsel, trackColors } from './gorsel.js?v=1792993306';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));

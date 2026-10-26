@@ -16,7 +16,7 @@ export class Motor {
     this.ctx = c;
     this.kit = new Kit(c);
     this.in = c.createGain();
-    this.in.gain.value = 0.9;
+    this.in.gain.value = 0.72;
     const biq = (type, f, q, g) => {
       const b = c.createBiquadFilter();
       b.type = type;
@@ -25,8 +25,8 @@ export class Motor {
       if (g != null) b.gain.value = g;
       return b;
     };
-    this.hp1 = biq('highpass', 22, 0.707);
-    this.hp2 = biq('highpass', 22, 0.707);
+    this.hp1 = biq('highpass', 30, 0.707);
+    this.hp2 = biq('highpass', 30, 0.707);
     this.low = biq('lowshelf', 130, null, 0);
     this.mud = biq('peaking', 320, 0.9, -1.5);
     this.high = biq('highshelf', 7500, null, 0);
@@ -75,7 +75,8 @@ export class Motor {
     this.vol.gain.setTargetAtTime(g, t, 0.08);
     const db = g > 0 ? 20 * Math.log10(g) : -60;
     const below = clamp(-db / 10, 0, 4);
-    const lowBoost = this.neighbor ? -4 : clamp(below * 1.6, 0, 6);
+    // taban: bas biraz kısık (kulaklıkta titreşim yapmasın); kısık seste en çok +1.5 dB telafi
+    const lowBoost = this.neighbor ? -6 : -3 + clamp(below * 0.6, 0, 1.5);
     this.low.gain.setTargetAtTime(lowBoost, t, 0.1);
     this.high.gain.setTargetAtTime(clamp(below * 0.7, 0, 2.5), t, 0.1);
   }
@@ -85,7 +86,7 @@ export class Motor {
     this.neighbor = on;
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
-    const f = on ? 105 : 22;
+    const f = on ? 105 : 30;
     this.hp1.frequency.setTargetAtTime(f, t, 0.2);
     this.hp2.frequency.setTargetAtTime(f, t, 0.2);
     this.setVolume(this.volume);
@@ -151,7 +152,8 @@ export class Motor {
     bassSat.oversample = '2x';
     nodes.push(bassSat);
     const bassLP = biq('lowpass', 2400, 0.5);
-    bassSat.connect(bassLP).connect(pumpBass);
+    const bassHP = biq('highpass', 36, 0.6); // duyulmayan derin titreşimi kes
+    bassSat.connect(bassLP).connect(bassHP).connect(pumpBass);
 
     const conv = c.createConvolver();
     conv.buffer = makeIR(c, fx.rt60, fx.size, fx.damp, rng);

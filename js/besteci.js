@@ -1,8 +1,8 @@
 // Besteci: parça tasarlar, ölçü ölçü çalar, DJ gibi parçadan parçaya geçer.
-import { Rng, hash, newSeed } from './rng.js?v=1792988056';
-import { MODES, modeWeights, diatonicChord, SHAPES, PROGS_MINOR, PROGS_MAJOR, PLANING, voiceChord, camelot } from './kuram.js?v=1792988056';
-import { renderKit } from './sesler.js?v=1792988056';
-import { trackName } from './adlar.js?v=1792988056';
+import { Rng, hash, newSeed } from './rng.js?v=1792993306';
+import { MODES, modeWeights, diatonicChord, SHAPES, PROGS_MINOR, PROGS_MAJOR, PLANING, voiceChord, camelot } from './kuram.js?v=1792993306';
+import { renderKit } from './sesler.js?v=1792993306';
+import { trackName } from './adlar.js?v=1792993306';
 
 const lerp = (a, b, x) => a + (b - a) * x;
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -181,7 +181,7 @@ const PADS = {
   choir: (r) => ({ formants: VOWELS[r.pick(['u', 'o', 'a'])], attack: r.range(0.4, 0.9), release: r.range(0.8, 1.5) }),
 };
 const BASSES = {
-  sub: (r) => ({ type: 'sub', sub: 1, top: r.range(0.25, 0.45), sustain: 0.85, decay: 0.4 }),
+  sub: (r) => ({ type: 'sub', sub: 0.8, top: r.range(0.3, 0.5), sustain: 0.8, decay: 0.4 }),
   organ: (r) => ({ type: 'organ', sub: 0.75, top: r.range(0.5, 0.75), sustain: r.range(0.4, 0.6), decay: r.range(0.15, 0.3) }),
   pluck: (r) => ({ type: 'pluck', sub: 0.85, top: r.range(0.35, 0.55), cutoff: r.range(280, 650), q: r.range(2, 6), fdecay: r.range(0.05, 0.14), sustain: r.range(0.5, 0.75), decay: r.range(0.2, 0.35) }),
   fm: (r) => ({ type: 'fm', sub: 0.7, top: r.range(0.4, 0.6), ratio: r.pick([1, 2, 0.5]), index: r.range(0.7, 1.8), fdecay: r.range(0.05, 0.15), sustain: r.range(0.5, 0.7), decay: r.range(0.2, 0.35) }),
@@ -206,7 +206,7 @@ function kitParams(r, style, tonic, lofi) {
     .filter((f) => f >= 42 && f <= 58);
   return {
     lofi, lofiRate: r.pick([22050, 26040, 32000]), bits: r.pick([10, 12, 12]),
-    kick: { f0: r.range(110, 170), f1: cands.length ? r.pick(cands) : 48, pdec: r.range(0.03, 0.07), dec: r.range(0.22, 0.5), hold: r.range(0, 0.04), drive: r.range(1, 2.6), click: r.range(0.08, 0.4) },
+    kick: { f0: r.range(110, 160), f1: cands.length ? r.pick(cands) : 50, pdec: r.range(0.03, 0.06), dec: r.range(0.2, 0.36), hold: r.range(0, 0.02), drive: r.range(0.8, 1.5), click: r.range(0.08, 0.3) },
     clap: { bp: r.range(900, 1700), q: r.range(1.1, 2.4), hits: r.int(3, 4), gap: r.range(0.008, 0.013), tail: r.range(0.08, 0.22) },
     snare: { f: r.range(170, 230), hp: r.range(1200, 2500), tail: r.range(0.05, 0.12) },
     hat: { tune: r.range(0.85, 1.35), noise: r.range(0.3, 1.2), bp: r.range(7000, 10500), hp: r.range(6000, 8500), closed: r.range(0.018, 0.05), open: r.range(0.12, 0.35) },
@@ -402,7 +402,7 @@ export function designTrack(seed, c) {
   const fx = {
     rt60: style === 'ambient' ? r.range(2.6, 3.2) : r.range(1.4, 2.8), size: r.range(0.3, 0.9), damp: r.range(1.2, 3.5), revLevel: r.range(0.75, 1.1),
     delayTime: (60 / bpm) * r.pick([0.75, 0.75, 0.5, 1, 1.5]), delayFb: chordInst === 'dub' ? r.range(0.55, 0.66) : r.range(0.25, 0.45), delayLP: r.range(2200, 4200), delayLevel: r.range(0.6, 1),
-    chorusRate: r.range(0.2, 0.6), chorusDepth: r.range(0.0012, 0.0028), bassDrive: r.range(1.3, 2.6),
+    chorusRate: r.range(0.2, 0.6), chorusDepth: r.range(0.0012, 0.0028), bassDrive: r.range(1.05, 1.5),
     lofi, wowRate: r.range(0.3, 0.8), wowDepth: r.range(0.0005, 0.0013), flutterRate: r.range(5.5, 9), lofiCut: r.range(4800, 8000),
   };
 
@@ -575,7 +575,7 @@ export class Track {
     const ch = bus.channel;
     const L = d.levels;
     this.ch = {
-      kick: ch('kick', { level: 0.9, group: 'drums' }),
+      kick: ch('kick', { level: 0.68, group: 'drums' }),
       clap: ch('clap', { level: 0.42, group: 'drums', rev: 0.22, pan: pr.range(-0.05, 0.05) }),
       snare: ch('snare', { level: 0.3, group: 'drums', rev: 0.18 }),
       hatO: ch('hatO', { level: 0.2, group: 'drums', pan: pr.range(0.05, 0.25), rev: 0.04 }),
@@ -585,7 +585,7 @@ export class Track {
       perc2: ch('perc2', { level: 0.18, group: 'drums', pan: pr.range(0.15, 0.45), rev: 0.2 }),
       ride: ch('ride', { level: 0.07, group: 'drums', pan: pr.range(0.1, 0.35), rev: 0.06 }),
       fx: ch('fx', { level: 0.22, group: 'music', rev: 0.6 }),
-      bass: ch('bass', { level: 0.82, group: 'bass' }),
+      bass: ch('bass', { level: 0.58, group: 'bass' }),
       chords: ch('chords', { level: 0.55 * L.chords, group: 'chorus', rev: 0.3, del: d.chordInst === 'dub' ? 0.6 : 0.16, filter: { type: 'lowpass', freq: 4000, q: 0.5 } }),
       pad: ch('pad', { level: 0.5 * L.pad, group: 'chorus', rev: 0.45, filter: { type: 'lowpass', freq: 2500, q: 0.5 } }),
       lead: ch('lead', { level: 0.42 * L.lead, group: 'music', rev: 0.32, del: 0.28, pan: pr.range(-0.25, 0.1) }),

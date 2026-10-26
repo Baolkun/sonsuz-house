@@ -114,8 +114,21 @@ vec3 scene(float id,vec2 p,float t,vec3 a,vec3 b,vec3 c){
 void main(){
   vec2 uv=gl_FragCoord.xy/uRes;
   vec2 p=(gl_FragCoord.xy-.5*uRes)/uRes.y;
-  p*=1.-uKick*.012;
+  p*=1.-uKick*.006;
   float t=uTime;
+  // sıvı bükme: bütün sahne yavaş bir akıntının içinde süzülür
+  vec2 fw=vec2(fbm(p*1.1+vec2(0.,t*.06)),fbm(p*1.1+vec2(3.1,-t*.05)))-.5;
+  vec2 fw2=vec2(fbm(p*2.3+fw*1.5-vec2(t*.04,0.)),fbm(p*2.3+fw*1.5+vec2(7.7,t*.035)))-.5;
+  p+=fw*(.22+uBass*.08)+fw2*.06;
+  // nota halkaları suya düşen damla gibi görüntüyü kırar
+  for(int i=0;i<10;i++){
+    vec4 R=uRip[i];
+    if(R.w<=0.) continue;
+    vec2 dv=p-R.xy;
+    float d=length(dv)+1e-4;
+    float rad=R.z*.32;
+    p+=dv/d*sin((d-rad)*38.)*exp(-pow((d-rad)*9.,2.))*exp(-R.z*1.3)*R.w*.012;
+  }
   // akor değişiminde renkler yavaşça yer değiştirir
   float ch=uChord;
   vec3 a=mix(uC1,uC2,.5+.5*sin(ch*1.3)), b=mix(uC2,uC3,.5+.5*sin(ch*1.3+2.)), c=mix(uC3,uC1,.25+.25*sin(ch*1.3+4.));
@@ -131,9 +144,9 @@ void main(){
     float d=length(p-R.xy);
     float age=R.z;
     float rad=age*.32;
-    float ring=exp(-pow((d-rad)*(26.-age*6.),2.))*exp(-age*1.4)*R.w;
+    float ring=exp(-pow((d-rad)*(22.-age*5.),2.))*exp(-age*1.4)*R.w;
     float core=exp(-d*d*120.)*exp(-age*5.)*R.w;
-    col+=uRipC[i]*(ring*.55+core*.6);
+    col+=uRipC[i]*(ring*.35+core*.45);
   }
   col=max(hueRot(col,uHue),0.);
   col*=uBright*(1.+uKick*.1);
@@ -222,7 +235,7 @@ export class Gorsel {
     this.resize();
     this.t0 = performance.now();
     this.last = 0;
-    this.fpsAvg = 30;
+    this.fpsAvg = 60;
     requestAnimationFrame((t) => this.frame(t));
   }
 
@@ -259,8 +272,8 @@ export class Gorsel {
     requestAnimationFrame((t) => this.frame(t));
     if (document.hidden) return;
     const dt = now - this.last;
-    // Mac pilini ve işlemcisini yormamak için ~30 kare/sn
-    if (dt < 31) return;
+    // akıcı 60 kare/sn; makine yetişemezse 30'a iner
+    if (dt < (this.cap30 ? 31 : 14)) return;
     this.last = now;
     const sec = Math.min(dt, 100) / 1000;
     this.fpsAvg += (1000 / dt - this.fpsAvg) * 0.05;
@@ -296,7 +309,8 @@ export class Gorsel {
         this.high += (hi * 3 - this.high) * 0.15;
       }
     }
-    this.kick *= Math.exp(-sec * 7);
+    this.kick *= Math.exp(-sec * 5);
+    this.kickS = (this.kickS || 0) + (this.kick - (this.kickS || 0)) * Math.min(1, sec * 14); // yumuşak nabız
     this.chord += (this.chordT - this.chord) * Math.min(1, sec * 0.6);
     this.bright += ((playing ? 1 : 0.55) - this.bright) * Math.min(1, sec * 0.8);
     if (this.mix > 0) {
@@ -311,7 +325,11 @@ export class Gorsel {
     this.rips = this.rips.filter((r) => r.age < 3.2);
 
     // çok yavaş makinede çözünürlüğü düşür
-    if (this.fpsAvg < 20 && this.scale > 0.3 && now - this.t0 > 15000) {
+    if (!this.cap30 && this.fpsAvg < 40 && now - this.t0 > 15000) {
+      this.cap30 = true;
+      this.fpsAvg = 30;
+    }
+    if (this.cap30 && this.fpsAvg < 20 && this.scale > 0.3 && now - this.t0 > 30000) {
       this.scale = 0.3;
       this.resize();
     }
@@ -320,7 +338,7 @@ export class Gorsel {
     const u = this.u;
     gl.uniform2f(u.uRes, this.cv.width, this.cv.height);
     gl.uniform1f(u.uTime, (now - this.t0) / 1000);
-    gl.uniform1f(u.uKick, this.kick);
+    gl.uniform1f(u.uKick, this.kickS || 0);
     gl.uniform1f(u.uBass, this.bass);
     gl.uniform1f(u.uHigh, this.high);
     gl.uniform1f(u.uEnergy, this.energy);

@@ -77,3 +77,29 @@ export function wav(buf) {
   }
   return new Blob([out], { type: 'audio/wav' });
 }
+
+// Bas payı: 120 Hz altının toplam içindeki payı (dB) ve sert tepe sayısı
+export async function basPayi(buf) {
+  const oc = new OfflineAudioContext(2, buf.length, buf.sampleRate);
+  const src = oc.createBufferSource();
+  src.buffer = buf;
+  const lp = oc.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 120;
+  const lp2 = oc.createBiquadFilter();
+  lp2.type = 'lowpass';
+  lp2.frequency.value = 120;
+  src.connect(lp).connect(lp2).connect(oc.destination);
+  src.start();
+  const low = await oc.startRendering();
+  const rms = (b) => {
+    let s = 0;
+    const L = b.getChannelData(0);
+    for (let i = 0; i < L.length; i++) s += L[i] * L[i];
+    return Math.sqrt(s / L.length);
+  };
+  let hot = 0;
+  const L = buf.getChannelData(0);
+  for (let i = 0; i < L.length; i++) if (Math.abs(L[i]) > 0.5) hot++;
+  return { lowShareDb: +(20 * Math.log10(rms(low) / rms(buf))).toFixed(1), totalDb: +(20 * Math.log10(rms(buf))).toFixed(1), hotPerSec: Math.round(hot / (L.length / buf.sampleRate)) };
+}
