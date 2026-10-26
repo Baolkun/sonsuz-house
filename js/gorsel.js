@@ -6,7 +6,7 @@ const VERT = `attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}`;
 const FRAG = `
 precision highp float;
 uniform vec2 uRes;
-uniform float uTime, uKick, uBass, uHigh, uEnergy, uSceneA, uSceneB, uMix, uChord, uBright;
+uniform float uTime, uKick, uBass, uHigh, uEnergy, uSceneA, uSceneB, uMix, uChord, uBright, uHue;
 uniform vec3 uC1, uC2, uC3, uD1, uD2, uD3;
 uniform vec4 uRip[10];
 uniform vec3 uRipC[10];
@@ -16,6 +16,12 @@ float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
   return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);}
 float fbm(vec2 p){float s=0.,a=.5;mat2 m=mat2(1.6,1.2,-1.2,1.6);for(int i=0;i<5;i++){s+=a*noise(p);p=m*p;a*=.5;}return s;}
 
+// renk tayfında yavaş dönüş: gri ekseni etrafında döndürür, parlaklığı korur
+vec3 hueRot(vec3 c,float a){
+  const vec3 k=vec3(.57735);
+  float ca=cos(a);
+  return c*ca+cross(k,c)*sin(a)+k*dot(k,c)*(1.-ca);
+}
 vec3 pal(float x, vec3 a, vec3 b, vec3 c){
   x=fract(x);
   return x<.5? mix(a,b,smoothstep(0.,.5,x)) : mix(b,c,smoothstep(.5,1.,x));
@@ -129,6 +135,7 @@ void main(){
     float core=exp(-d*d*120.)*exp(-age*5.)*R.w;
     col+=uRipC[i]*(ring*.55+core*.6);
   }
+  col=max(hueRot(col,uHue),0.);
   col*=uBright*(1.+uKick*.1);
   // ortada yazı okunsun diye hafif karartma, kenarlarda vinyet
   float v=smoothstep(1.25,.25,length(p*vec2(.85,1.)));
@@ -208,7 +215,7 @@ export class Gorsel {
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
     this.u = {};
-    for (const n of ['uRes', 'uTime', 'uKick', 'uBass', 'uHigh', 'uEnergy', 'uSceneA', 'uSceneB', 'uMix', 'uChord', 'uBright', 'uC1', 'uC2', 'uC3', 'uD1', 'uD2', 'uD3', 'uRip', 'uRipC']) this.u[n] = gl.getUniformLocation(this.pr, n);
+    for (const n of ['uRes', 'uTime', 'uKick', 'uBass', 'uHigh', 'uEnergy', 'uSceneA', 'uSceneB', 'uMix', 'uChord', 'uBright', 'uHue', 'uC1', 'uC2', 'uC3', 'uD1', 'uD2', 'uD3', 'uRip', 'uRipC']) this.u[n] = gl.getUniformLocation(this.pr, n);
     this.ok = true;
     this.scale = 0.5;
     addEventListener('resize', () => this.resize());
@@ -293,7 +300,7 @@ export class Gorsel {
     this.chord += (this.chordT - this.chord) * Math.min(1, sec * 0.6);
     this.bright += ((playing ? 1 : 0.55) - this.bright) * Math.min(1, sec * 0.8);
     if (this.mix > 0) {
-      this.mix += sec / 14; // 14 sn'de yeni sahneye geçiş
+      this.mix += sec / 40; // 40 sn'de yeni sahneye süzülerek geçiş
       if (this.mix >= 1) {
         this.mix = 0;
         this.sceneA = this.sceneB;
@@ -323,6 +330,7 @@ export class Gorsel {
     gl.uniform1f(u.uMix, mx);
     gl.uniform1f(u.uChord, this.chord);
     gl.uniform1f(u.uBright, this.bright);
+    gl.uniform1f(u.uHue, (((now - this.t0) / 1000) * 2 * Math.PI) / 900); // 15 dakikada bir tur
     gl.uniform3fv(u.uC1, this.colA[0]);
     gl.uniform3fv(u.uC2, this.colA[1]);
     gl.uniform3fv(u.uC3, this.colA[2]);

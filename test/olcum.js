@@ -2,7 +2,7 @@
 import { Motor } from '../js/motor.js';
 import { Akis, Track } from '../js/besteci.js';
 
-export async function olc({ secs = 120, energy = 0.5, mood = 0.5, shortFirst = 0, sr = 44100 } = {}, prog = {}) {
+export async function olc({ secs = 120, energy = 0.5, mood = 0.5, shortFirst = 0, outLen = 32, sr = 44100 } = {}, prog = {}) {
   const oc = new OfflineAudioContext(2, sr * secs, sr);
   const m = new Motor();
   m.init(oc);
@@ -16,7 +16,7 @@ export async function olc({ secs = 120, energy = 0.5, mood = 0.5, shortFirst = 0
   tr.bus.out.gain.value = 1;
   ak.tracks.push(tr);
   ak.bpm = dna.bpm;
-  if (shortFirst) tr.forceOutro(shortFirst, 16);
+  if (shortFirst) tr.forceOutro(shortFirst, outLen);
   ak.nextBarTime = 0.05;
   const log = [];
   ak.on('track', (t) => log.push({ bar: ak.bar, style: t.d.style, bpm: t.d.bpm, key: t.d.tonic + ' ' + t.d.mode, chord: t.d.chordInst, lead: t.d.lead.inst, bass: t.d.bassType, prog: t.d.progId }));

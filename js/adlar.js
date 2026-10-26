@@ -12,8 +12,6 @@ const EN = {
   yer: ['Lisbon', 'Ibiza', 'Kyoto', 'Marseille', 'Naples', 'Tangier', 'Havana', 'Brooklyn', 'Detroit', 'Chicago', 'Kreuzberg', 'Montreal', 'Athens', 'Istanbul', 'Bodrum', 'Reykjavík', 'Osaka', 'Malmö'],
 };
 
-const pad2 = (n) => String(n).padStart(2, '0');
-
 export function trackName(seed, lang = 'tr') {
   const r = new Rng(seed ^ 0x9e3779b9);
   const W = lang === 'tr' ? TR : EN;
@@ -22,17 +20,14 @@ export function trackName(seed, lang = 'tr') {
   let i2 = r.pick(W.isim);
   if (i2 === i) i2 = r.pick(W.isim);
   const y = r.pick(W.yer);
-  const time = `${pad2(r.pick([0, 1, 2, 3, 4, 5, 6, 18, 19, 20, 21, 22, 23]))}:${pad2(r.int(0, 59))}`;
   const and = lang === 'tr' ? 've' : 'and';
   const forms = [
     () => `${s} ${i}`,
     () => `${s} ${i}`,
-    () => `${i}, ${time}`,
     () => `${i} ${and} ${i2}`,
-    () => `${y}, ${time}`,
     () => `${s} ${y}`,
-    () => `${i} ${r.int(2, 909)}`,
     () => `${y} ${i}`,
+    () => `${i} ${and} ${s} ${i2}`,
   ];
   return r.pick(forms)();
 }

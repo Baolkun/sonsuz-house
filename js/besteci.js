@@ -1,8 +1,8 @@
 // Besteci: parça tasarlar, ölçü ölçü çalar, DJ gibi parçadan parçaya geçer.
-import { Rng, hash, newSeed } from './rng.js';
-import { MODES, modeWeights, diatonicChord, SHAPES, PROGS_MINOR, PROGS_MAJOR, PLANING, voiceChord, camelot } from './kuram.js';
-import { renderKit } from './sesler.js';
-import { trackName } from './adlar.js';
+import { Rng, hash, newSeed } from './rng.js?v=1792987588';
+import { MODES, modeWeights, diatonicChord, SHAPES, PROGS_MINOR, PROGS_MAJOR, PLANING, voiceChord, camelot } from './kuram.js?v=1792987588';
+import { renderKit } from './sesler.js?v=1792987588';
+import { trackName } from './adlar.js?v=1792987588';
 
 const lerp = (a, b, x) => a + (b - a) * x;
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -412,9 +412,11 @@ export function designTrack(seed, c) {
   }
   const padI = padInst || (style === 'ambient' ? 'warm' : null);
 
-  const introBars = style === 'ambient' ? 16 : r.pick([16, 16, 32]);
-  const outroBars = style === 'ambient' ? 16 : r.pick([16, 16, 32]);
-  const segs = arrange(r, { layers, introBars, outroBars, style, energy: E });
+  // akış: ilk parça dışında hiçbiri sıfırdan başlamaz; önceki parçayla 32 ölçü boyunca katman katman harmanlanır
+  const flow = !!c.prev;
+  const introBars = flow ? 32 : style === 'ambient' ? 16 : r.pick([16, 32]);
+  const outroBars = 32;
+  const segs = arrange(r, { layers, introBars, outroBars, style, energy: E, flow });
 
   const fx = {
     rt60: style === 'ambient' ? r.range(2.6, 3.2) : r.range(1.4, 2.8), size: r.range(0.3, 0.9), damp: r.range(1.2, 3.5), revLevel: r.range(0.75, 1.1),
@@ -451,7 +453,7 @@ function arrange(r, d) {
   if (d.style === 'ambient') {
     const order = ['pad', 'chords', 'bass', 'lead', 'lead2'];
     const st = new Set(['pad']);
-    const nPh = r.int(4, 6);
+    const nPh = r.int(6, 8);
     for (let i = 0; i < nPh; i++) {
       if (i > 0 && i < nPh - 1) {
         const nx = order.find((l) => has(l) && !st.has(l));
@@ -471,6 +473,11 @@ function arrange(r, d) {
   const state = new Set(['kick', firstHat]);
   const introQ = r.shuffle(['hatO', 'hatC', 'perc1', 'shaker'].filter((l) => has(l) && !state.has(l)));
   introQ.push('clap');
+  if (d.flow) {
+    // önceki parçanın yerini dolu olarak devralacak: giriş baştan tam
+    for (const l of [...introQ, 'bass', 'chords', 'pad', 'lead']) state.add(l);
+    introQ.length = 0;
+  }
   const introPh = d.introBars / 8;
   for (let i = 0; i < introPh; i++) {
     if (i > 0 && introQ.length) state.add(introQ.shift());
@@ -492,9 +499,9 @@ function arrange(r, d) {
   for (const l of aQ) if (has(l)) state.add(l);
   // ara: davul ve bas çekilir, pad ve melodi kalır
   const brPh = r.chance(0.6) ? 1 : 2;
-  const brk = new Set([...state].filter((l) => !['kick', 'bass', 'clap', 'perc2', 'ride', 'shaker'].includes(l)));
+  // yumuşak ara: yalnız kick ve el çırpma çekilir, bas ve hi-hat akmaya devam eder
+  const brk = new Set([...state].filter((l) => !['clap', 'perc2', 'ride'].includes(l)));
   brk.add('pad');
-  if (r.chance(0.5)) brk.delete('hatC');
   for (let i = 0; i < brPh; i++) push('break', brk, { fill: i === brPh - 1 ? 'sweep' : null });
   // B bölümü: zirve katmanları teker teker
   const bPh = r.int(3, 5);
@@ -509,11 +516,10 @@ function arrange(r, d) {
     }
     push('b', state, { fill: i === bPh - 1 ? 'big' : smallFill(), alt });
   }
-  // çıkış: melodiler, sonra akorlar çekilir; davul ve bas DJ geçişine kalır
+  // çıkış: sonraki parçaya katman katman devredilecek bölüm
   const outPh = d.outroBars / 8;
-  const removeOrder = [['lead', 'lead2', 'vox'], ['chords', 'pad'], ['perc2', 'ride'], ['shaker']];
   for (let i = 0; i < outPh; i++) {
-    for (const l of removeOrder[Math.min(i, removeOrder.length - 1)]) state.delete(l);
+    // çıkış dolu kalır; incelme yerine sonraki parçayla harmanlanır
     push('outro', state, { fill: smallFill() });
   }
   return segs;
@@ -559,6 +565,7 @@ export class Track {
       lead2: ch('lead2', { level: 0.36 * L.lead, group: 'music', rev: 0.38, del: 0.24, pan: pr.range(0.05, 0.3) }),
       vox: ch('vox', { level: 0.34, group: 'music', rev: 0.5, del: 0.3, pan: pr.range(-0.15, 0.15) }),
     };
+    for (const c of Object.values(this.ch)) c.base = c.input.gain.value;
     this.pumpDepth = { bass: pr.range(0.45, 0.7), music: pr.range(0.15, 0.35), rel: pr.range(0.05, 0.09) };
     this.ready = true;
   }
@@ -611,12 +618,11 @@ export class Track {
       else kept.push(s);
     }
     const last = kept[kept.length - 1] || this.segs[0];
-    const st = new Set(last.on);
-    for (const l of ['kick', 'hatO', 'clap', 'bass']) if (this.d.layers.has(l)) st.add(l);
+    const st = new Set(last.sec === 'break' ? this.segs.find((x) => x.sec === 'b')?.on || last.on : last.on);
+    for (const l of ['kick', 'hatO', 'clap', 'bass', 'chords']) if (this.d.layers.has(l)) st.add(l);
     let start = fromBar;
     for (let i = 0; i < outLen / 8; i++) {
-      for (const l of i === 0 ? ['lead', 'lead2', 'vox'] : ['chords', 'pad', 'perc2', 'ride']) st.delete(l);
-      kept.push({ start, len: 8, sec: 'outro', on: new Set(st), alt: new Set(), fill: 'drop', index: kept.length });
+      kept.push({ start, len: 8, sec: 'outro', on: new Set(st), alt: new Set(), fill: null, index: kept.length });
       start += 8;
     }
     this.segs = kept;
@@ -673,6 +679,11 @@ export class Track {
     const hit = (chan, buf, t, v, rate = 1) => {
       if (buf) K.hit(chan.input, buf, t, v, rate);
     };
+
+    // arada kick kısılır (durmaz), sonra geri gelir
+    if (inSeg === 0 && (seg.sec === 'break' || this.segs[seg.index - 1]?.sec === 'break')) {
+      C.kick.input.gain.setTargetAtTime(C.kick.base * (seg.sec === 'break' ? 0.6 : 1), t0, BAR * 1.5);
+    }
 
     // ---- davullar ----
     const drums = d.drums;
@@ -880,6 +891,16 @@ export class Track {
   }
 }
 
+// Devir sırası: [kanallar, başlangıç, bitiş (geçişin oranı olarak), doğrusal mı]
+// Önce perküsyon, sonra hi-hat ve pad; armoni (akor, bas, melodi) tek ölçüde birlikte, en son kick.
+const HANDOFF = [
+  [['perc1', 'perc2', 'shaker', 'ride'], 0, 0.3, false],
+  [['hatO', 'hatC'], 0.22, 0.42, false],
+  [['pad', 'fx'], 0.3, 0.62, false],
+  [['chords', 'bass', 'lead', 'lead2', 'vox'], 0.5, 0.54, true],
+  [['kick', 'clap', 'snare'], 0.6, 0.7, false],
+];
+
 // ---------- Akış: parçaları sıraya dizer, saati sürer, geçişleri yapar ----------
 const load = (k, def) => {
   try {
@@ -1018,27 +1039,29 @@ export class Akis {
     if (lead) this.bpm += clamp(lead.d.bpm - this.bpm, -0.12, 0.12);
     const BAR = 240 / this.bpm;
     const act = this.tracks.filter((tr) => tr.ready && b >= tr.startBar && b < tr.startBar + tr.len);
-    // DJ geçişi: bas değişimi, alçak/yüksek geçiren süzgeçler, ses dengesi
+    // Akış geçişi: iki parça da dolu çalar, katmanlar sırayla devredilir (renk tayfında kayar gibi)
     for (let i = 1; i < act.length; i++) {
       const A = act[i - 1];
       const B = act[i];
       const ov = B.overlapIn;
       const k = b - B.startBar;
-      if (k < 0 || k >= ov) continue;
-      const half = ov / 2;
-      const x = k / half;
-      const BB = B.bus;
-      const AB = A.bus;
-      BB.out.gain.setTargetAtTime(k < half ? lerp(0.45, 1, x) : 1, t, BAR / 3);
-      BB.djHP.frequency.setTargetAtTime(k < half ? 18 * (380 / 18) ** (1 - x) : 18, t, BAR / 3);
-      if (k < half) B.mute.add('bass');
-      else B.mute.delete('bass');
-      if (k >= half) {
-        A.mute.add('bass');
-        AB.djHP.frequency.setTargetAtTime(18 * (320 / 18) ** ((k - half) / half), t, BAR / 3);
+      if (k < 0 || k > ov) continue;
+      if (k === 0) B.bus.out.gain.setValueAtTime(1, t);
+      const tau = BAR / 2;
+      for (const [names, w0, w1, hard] of HANDOFF) {
+        const a0 = Math.round(w0 * ov);
+        const a1 = Math.max(a0 + 1, Math.round(w1 * ov));
+        const x = clamp((k + 1 - a0) / (a1 - a0), 0, 1);
+        const gA = hard ? 1 - x : Math.cos((x * Math.PI) / 2);
+        const gB = hard ? x : Math.sin((x * Math.PI) / 2);
+        for (const n of names) {
+          if (A.ch[n]) A.ch[n].input.gain.setTargetAtTime(A.ch[n].base * gA, t, tau);
+          if (B.ch[n]) B.ch[n].input.gain.setTargetAtTime(B.ch[n].base * gB, t, tau);
+        }
       }
-      const fadeFrom = ov - Math.min(8, half);
-      if (k >= fadeFrom) AB.out.gain.setTargetAtTime(lerp(1, 0, (k - fadeFrom + 1) / (ov - fadeFrom)), t, BAR / 3);
+      // yankı kuyrukları son çeyrekte söner
+      const f0 = Math.round(ov * 0.75);
+      if (k >= f0) A.bus.out.gain.setTargetAtTime(lerp(1, 0, (k - f0 + 1) / (ov - f0)), t, BAR / 2);
     }
     for (const tr of act) {
       try {
@@ -1079,6 +1102,7 @@ export class Akis {
       await tr.prepare();
       const ov = Math.min(cur.d.outroBars, dna.introBars);
       tr.overlapIn = ov;
+      for (const [names] of HANDOFF) for (const n of names) if (tr.ch[n]) tr.ch[n].input.gain.value = 0;
       let start = cur.startBar + cur.len - ov;
       if (start < this.bar + 1) {
         const extra = Math.ceil((this.bar + 2 - start) / 8) * 8;
@@ -1108,7 +1132,7 @@ export class Akis {
     const rel = this.bar - cur.startBar;
     if (cur.overlapIn && rel < cur.overlapIn) return false; // geçiş zaten sürüyor
     const from = Math.ceil((rel + 2) / 4) * 4;
-    cur.forceOutro(from, quick ? 8 : 16);
+    cur.forceOutro(from, quick ? 16 : 24);
     this.prepareNext(cur);
     return true;
   }
