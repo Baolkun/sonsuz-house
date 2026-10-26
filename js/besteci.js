@@ -1,8 +1,8 @@
 // Besteci: parça tasarlar, ölçü ölçü çalar, DJ gibi parçadan parçaya geçer.
-import { Rng, hash, newSeed } from './rng.js?v=1792987588';
-import { MODES, modeWeights, diatonicChord, SHAPES, PROGS_MINOR, PROGS_MAJOR, PLANING, voiceChord, camelot } from './kuram.js?v=1792987588';
-import { renderKit } from './sesler.js?v=1792987588';
-import { trackName } from './adlar.js?v=1792987588';
+import { Rng, hash, newSeed } from './rng.js?v=1792988056';
+import { MODES, modeWeights, diatonicChord, SHAPES, PROGS_MINOR, PROGS_MAJOR, PLANING, voiceChord, camelot } from './kuram.js?v=1792988056';
+import { renderKit } from './sesler.js?v=1792988056';
+import { trackName } from './adlar.js?v=1792988056';
 
 const lerp = (a, b, x) => a + (b - a) * x;
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -304,48 +304,14 @@ export function designTrack(seed, c) {
   const cam = camelot(tonic, mode);
   const minor = MODES[mode].minor;
 
-  // armoni
+  // armoni: iki ayrı akor dizisi; bölümler arasında dönüşür, döngü kısa kalmaz
   const harmonyType = r.weighted(S.harmony);
-  let chords;
-  let progId;
-  if (harmonyType === 'diatonic') {
-    const list = minor ? PROGS_MINOR : PROGS_MAJOR;
-    const recent = new Set((c.history || []).slice(-6).map((h) => h.prog));
-    let pi = r.int(0, list.length - 1);
-    for (let k = 0; k < 4 && recent.has((minor ? 'm' : 'M') + pi); k++) pi = r.int(0, list.length - 1);
-    progId = (minor ? 'm' : 'M') + pi;
-    const size = r.weighted(S.size);
-    chords = list[pi].map((d) => {
-      const ch = diatonicChord(mode, d, size);
-      let tones = ch.tones.slice();
-      if (tones.length >= 5 && r.chance(0.5)) tones = tones.filter((x) => x !== 7); // beşliyi at
-      return { root: ch.root, pcs: tones.map((x) => ch.root + x) };
-    });
-  } else {
-    const shapes = minor ? ['m9', 'm11', 'quartal', 'min11open', 'm7'] : ['maj9', 'six9', 'sus9', 'quartal'];
-    const shape = r.pick(shapes);
-    const pi = r.int(0, PLANING.length - 1);
-    progId = 'p' + pi + shape;
-    chords = PLANING[pi].map((mv) => ({ root: mv, pcs: SHAPES[shape].map((x) => mv + x) }));
-  }
-  const n = chords.length;
-  const upc = style === 'ambient' ? r.pick([4, 8]) : n === 2 ? r.pick([2, 2, 4, 1]) : r.pick([2, 2, 4]);
-
-  // ses yürütme
-  const voicing = [];
-  const padVoicing = [];
-  let pv = null;
-  let pp = null;
-  for (let pass = 0; pass < 2; pass++) {
-    for (let i = 0; i < n; i++) {
-      const abs = chords[i].pcs.map((x) => x + tonic);
-      const upper = abs.filter((x) => mod12(x - chords[i].root - tonic) !== 0 || abs.length <= 3);
-      pv = voiceChord(upper.length >= 3 ? upper : abs, 52, 77, pv, r);
-      pp = voiceChord(abs, 46, 72, pp, r, { center: 60 });
-      voicing[i] = pv;
-      padVoicing[i] = pp;
-    }
-  }
+  const avoid = new Set((c.history || []).slice(-6).map((h) => h.prog));
+  const h1 = buildHarmony(r, { type: harmonyType, mode, minor, tonic, style, S, avoid });
+  avoid.add(h1.progId);
+  const h2 = buildHarmony(r, { type: r.chance(0.75) ? harmonyType : r.weighted(S.harmony), mode, minor, tonic, style, S, avoid });
+  const progId = h1.progId;
+  const { chords, n, upc, voicing, padVoicing } = h1;
 
   // enstrümanlar
   const pick = (list, prefix) => r.weighted(list.map(([v, w]) => [v, w * tw(prefix + v)]));
@@ -358,14 +324,28 @@ export function designTrack(seed, c) {
   const chordP = chordInst === 'rhodes' ? rhodesP(r) : chordInst === 'organ' ? organP(r) : chordInst === 'juno' ? junoP(r) : chordInst === 'dub' ? dubP(r) : MALLETS.pluck(r);
   const rhythmSet = chordInst === 'rhodes' ? r.pick(['comp', 'stab']) : chordInst === 'organ' ? r.pick(['organ', 'stab']) : chordInst === 'dub' ? 'dub' : style === 'ambient' ? 'ambient' : 'stab';
   const rset = style === 'ambient' ? CHORD_RHYTHM.ambient : CHORD_RHYTHM[rhythmSet];
-  const chordRhythm = [r.pick(rset), r.pick(rset)];
+  const chordRhythm = r.shuffle(rset).slice(0, 3);
+  while (chordRhythm.length < 3) chordRhythm.push(r.pick(rset));
   const bassPatId = r.pick(S.bassPat);
   const bassMain = BASS_PATS[bassPatId];
   const bassAlt = bassMain.slice(0, 12) + r.pick(FLOURISH);
+  const bassAlt2 = bassMain.slice(0, 12) + r.pick(FLOURISH);
+  const others = S.bassPat.filter((x) => x !== bassPatId);
+  const bassB = BASS_PATS[others.length ? r.pick(others) : bassPatId];
+  const bassBAlt = bassB.slice(0, 12) + r.pick(FLOURISH);
 
   const density = clamp(0.25 + E * 0.5 + r.range(-0.15, 0.15) - (c.focus ? 0.2 : 0), 0.1, 0.9);
-  const motif = makeMotif(r, r.pick([1, 2, 2]), density, leadInst);
-  const motif2 = makeMotif(r, r.pick([1, 2]), density * 0.8, lead2Inst);
+  // her bölüm ailesi kendi motifini alır: A, B, ara (seyrek)
+  const family = (inst, dens) =>
+    [dens, dens * 1.1, dens * 0.6].map((dn) => {
+      const m = makeMotif(r, r.pick([1, 2, 2]), clamp(dn, 0.08, 0.95), inst);
+      const v = vary(r, m);
+      return { m, B: answer(r, m), V: v, C: answer(r, v) };
+    });
+  const fam1 = family(leadInst, density);
+  const fam2 = family(lead2Inst, density * 0.8);
+  const motif = fam1[0].m;
+  const motif2 = fam2[0].m;
 
   // davullar
   const twoStep = r.chance(S.twoStep);
@@ -389,6 +369,7 @@ export function designTrack(seed, c) {
     ride: r.pick(DRUMS.ride),
     perc1: percPart(percKinds[0]),
     perc2: percPart(percKinds[1]),
+    perc1B: percPart(percKinds[0]),
     snare: r.chance(S.snare),
     choke: r.chance(0.6),
     clapEarly: r.range(0, 0.006),
@@ -428,11 +409,12 @@ export function designTrack(seed, c) {
   return {
     seed, style, bpm, swing, tonic, mode, cam, minor, progId, harmonyType,
     harmony: { chords, n, upc, voicing, padVoicing },
+    harmonies: [h1, h2],
     chordInst, chordP, chordRhythm, chordLen: r.range(1.2, 2.2), strum: chordInst === 'rhodes' || chordInst === 'mallet' ? r.range(0.004, 0.012) : 0.001,
     padInst: padI, padP: padI ? PADS[padI](r) : null,
-    bassType, bassP: BASSES[bassType](r), bassPatId, bassMain, bassAlt, pedal: r.chance(0.12), glide: r.chance(0.35),
-    lead: { inst: leadInst, p: leadParams(r, leadInst), motif, motifB: answer(r, motif), motifV: vary(r, motif), lo: leadInst === 'rhodes' ? 62 : 67 },
-    lead2: { inst: lead2Inst, p: leadParams(r, lead2Inst), motif: motif2, motifB: answer(r, motif2), motifV: vary(r, motif2), lo: lead2Inst === 'rhodes' ? 62 : 69 },
+    bassType, bassP: BASSES[bassType](r), bassPatId, bassMain, bassAlt, bassAlt2, bassB, bassBAlt, pedal: r.chance(0.12), glide: r.chance(0.35),
+    lead: { inst: leadInst, p: leadParams(r, leadInst), motif, fams: fam1, lo: leadInst === 'rhodes' ? 62 : 67 },
+    lead2: { inst: lead2Inst, p: leadParams(r, lead2Inst), motif: motif2, fams: fam2, lo: lead2Inst === 'rhodes' ? 62 : 69 },
     vox: { kind: r.pick(['chop', 'ooh']), p: leadParams(r, 'vox'), pat: r.pick(VOX_CHOPS) },
     drums, layers, segs, len: segs.reduce((a, s) => a + s.len, 0), introBars, outroBars,
     kitP: kitParams(r, style, tonic, lofi), fx,
@@ -440,6 +422,50 @@ export function designTrack(seed, c) {
     levels: { chords: r.range(0.85, 1.1), lead: r.range(0.85, 1.1), pad: r.range(0.85, 1.15) },
     name: { tr: trackName(seed, 'tr'), en: trackName(seed, 'en') },
   };
+}
+
+// Akor dizisi kurar ve seslerini yürütür
+function buildHarmony(r, o) {
+  const { mode, minor, tonic, style, S } = o;
+  let chords;
+  let progId;
+  if (o.type === 'diatonic') {
+    const list = minor ? PROGS_MINOR : PROGS_MAJOR;
+    let pi = r.int(0, list.length - 1);
+    for (let k = 0; k < 6 && o.avoid.has((minor ? 'm' : 'M') + pi); k++) pi = r.int(0, list.length - 1);
+    progId = (minor ? 'm' : 'M') + pi;
+    const size = r.weighted(S.size);
+    chords = list[pi].map((d) => {
+      const ch = diatonicChord(mode, d, size);
+      let tones = ch.tones.slice();
+      if (tones.length >= 5 && r.chance(0.5)) tones = tones.filter((x) => x !== 7); // beşliyi at
+      return { root: ch.root, pcs: tones.map((x) => ch.root + x) };
+    });
+  } else {
+    const shapes = minor ? ['m9', 'm11', 'quartal', 'min11open', 'm7'] : ['maj9', 'six9', 'sus9', 'quartal'];
+    const shape = r.pick(shapes);
+    let pi = r.int(0, PLANING.length - 1);
+    for (let k = 0; k < 6 && o.avoid.has('p' + pi + shape); k++) pi = r.int(0, PLANING.length - 1);
+    progId = 'p' + pi + shape;
+    chords = PLANING[pi].map((mv) => ({ root: mv, pcs: SHAPES[shape].map((x) => mv + x) }));
+  }
+  const n = chords.length;
+  const upc = style === 'ambient' ? r.pick([4, 8]) : n === 2 ? r.pick([2, 4, 4, 8]) : r.pick([2, 4, 4]);
+  const voicing = [];
+  const padVoicing = [];
+  let pv = null;
+  let pp = null;
+  for (let pass = 0; pass < 2; pass++) {
+    for (let i = 0; i < n; i++) {
+      const abs = chords[i].pcs.map((x) => x + tonic);
+      const upper = abs.filter((x) => mod12(x - chords[i].root - tonic) !== 0 || abs.length <= 3);
+      pv = voiceChord(upper.length >= 3 ? upper : abs, 52, 77, pv, r);
+      pp = voiceChord(abs, 46, 72, pp, r, { center: 60 });
+      voicing[i] = pv;
+      padVoicing[i] = pp;
+    }
+  }
+  return { chords, n, upc, voicing, padVoicing, progId };
 }
 
 // Bölümler: her 8 ölçülük cümle sonunda tek değişiklik
@@ -485,7 +511,7 @@ function arrange(r, d) {
   }
   while (introQ.length) state.add(introQ.shift());
   // A bölümü: bas ve akorlar girer, sonra pad, melodi
-  const aPh = r.int(3, 5);
+  const aPh = r.int(2, 4);
   const aQ = r.chance(0.5) ? ['chords', 'pad', 'lead', 'perc2'] : ['pad', 'chords', 'lead', 'perc2'];
   state.add('bass');
   if (r.chance(0.5)) state.add(aQ.shift());
@@ -504,7 +530,7 @@ function arrange(r, d) {
   brk.add('pad');
   for (let i = 0; i < brPh; i++) push('break', brk, { fill: i === brPh - 1 ? 'sweep' : null });
   // B bölümü: zirve katmanları teker teker
-  const bPh = r.int(3, 5);
+  const bPh = r.int(2, 4);
   const peak = r.shuffle(['ride', 'lead2', 'vox']).filter(has);
   if (peak.length) state.add(peak.shift());
   const altCycle = r.shuffle(['chords', 'hats', 'bass', 'chords']);
@@ -532,6 +558,7 @@ export class Track {
     this.m = motor;
     this.len = dna.len;
     this.segs = dna.segs.map((s) => ({ ...s, on: new Set(s.on), alt: new Set(s.alt) }));
+    this.assignVariants(this.segs);
     this.mute = new Set();
     this.ready = false;
     this.startBar = 0;
@@ -576,13 +603,28 @@ export class Track {
     } catch {}
   }
 
+  // Her 8 ölçülük bölüm: hangi akor dizisi, hangi motif ailesi, hangi bas/akor/perküsyon kalıbı
+  assignVariants(segs) {
+    const cnt = {};
+    for (const s of segs) {
+      const i = (cnt[s.sec] = (cnt[s.sec] ?? -1) + 1);
+      const B = s.sec === 'b' || s.sec === 'break';
+      s.harm = s.sec === 'break' ? 1 : s.sec === 'b' ? (i % 2 === 0 ? 1 : 0) : s.sec === 'a' ? (i >= 2 && i % 2 === 0 ? 1 : 0) : s.sec === 'amb' ? i % 2 : 0;
+      s.fam = s.sec === 'break' ? 2 : s.sec === 'b' ? 1 : s.sec === 'amb' ? i % 3 : s.sec === 'outro' ? 2 * (i % 2) : 0;
+      s.bassVar = B ? 1 : 0;
+      s.chordVar = s.sec === 'b' ? (i % 2 === 0 ? 1 : 2) : s.sec === 'break' ? 2 : i % 2 === 1 && s.sec === 'a' ? 2 : 0;
+      s.percVar = B ? 1 : 0;
+      s.shift = [0, 0, 1, -1, 2, 1][(s.index * 5 + i) % 6]; // motif perdesi bölümden bölüme kayar
+    }
+  }
+
   segAt(b) {
     for (const s of this.segs) if (b >= s.start && b < s.start + s.len) return s;
     return null;
   }
 
   chordIndex(b, half) {
-    const H = this.d.harmony;
+    const H = this.H || this.d.harmony;
     return Math.floor((b * 2 + half) / H.upc) % H.n;
   }
 
@@ -657,7 +699,8 @@ export class Track {
     const C = this.ch;
     const kit = this.kit;
     const K = this.m.kit;
-    const H2 = d.harmony;
+    this.H = (d.harmonies && d.harmonies[seg.harm ?? 0]) || d.harmony;
+    const H2 = this.H;
 
     // yavaş kayma: asal periyotlu iki dalga, parça boyunca tını hiç durmaz
     const dr = d.drift;
@@ -734,7 +777,7 @@ export class Track {
       for (const [s, v] of hits(drums.ride)) hit(C.ride, kit.ride, T(s) + H(), v * (0.8 + 0.2 * r.f()));
     }
     for (const pn of ['perc1', 'perc2']) {
-      const part = drums[pn];
+      const part = pn === 'perc1' && seg.percVar && drums.perc1B ? drums.perc1B : drums[pn];
       if (!part || !on(pn)) continue;
       for (const [inst, pat] of Object.entries(part)) {
         if (!pat || !kit[inst]) continue;
@@ -759,7 +802,8 @@ export class Track {
 
     // ---- bas ----
     if (on('bass')) {
-      const pat = inSeg % 4 === 3 ? d.bassAlt : d.bassMain;
+      const main = seg.bassVar && d.bassB ? d.bassB : d.bassMain;
+      const pat = seg.bassVar && d.bassB ? (inSeg % 4 === 3 ? d.bassBAlt : main) : inSeg % 8 === 7 ? d.bassAlt2 || d.bassAlt : inSeg % 4 === 3 ? d.bassAlt : main;
       let prevNote = null;
       let prevEnd = -1;
       for (const nt of notes(pat)) {
@@ -793,8 +837,12 @@ export class Track {
 
     // ---- akorlar ----
     if (on('chords')) {
-      const pat = d.chordRhythm[seg.alt.has('chords') ? 1 : 0];
-      for (const nt of notes(pat)) {
+      const cr = d.chordRhythm;
+      const pat = cr[((seg.chordVar ?? 0) + (seg.alt.has('chords') ? 1 : 0)) % cr.length];
+      const list = notes(pat);
+      const drop = list.length > 2 && r.chance(0.2) ? r.int(0, list.length - 1) : -1;
+      for (const [ni, nt] of list.entries()) {
+        if (ni === drop) continue;
         const ci = nt.role === 'n' ? this.chordIndex(b + 1, 0) : this.chordIndex(b, nt.s >= 8 ? 1 : 0);
         const v = H2.voicing[ci];
         const dur = (nt.len > 1 ? nt.len : d.chordLen) * s16;
@@ -823,9 +871,10 @@ export class Track {
       const q = inSeg % 4;
       const who = l1 && l2 ? (q < 2 ? 'lead' : 'lead2') : l1 ? 'lead' : 'lead2';
       const L = d[who];
-      let mot = L.motif;
-      if (!(l1 && l2) && q >= 2) mot = L.motifB;
-      if (inSeg % 8 >= 6) mot = L.motifV;
+      // 8 ölçülük cümle: sunuş, cevap, değişik tekrar, kapanış; her bölüm ailesi ayrı motif
+      const F = L.fams ? L.fams[(seg.fam ?? 0) % L.fams.length] : { m: L.motif, B: L.motif, V: L.motif, C: L.motif };
+      const mot = [F.m, F.B, F.V, F.C][Math.floor((inSeg % 8) / 2)];
+      void q;
       const mb = (inSeg % 2) % mot.bars;
       const lo = L.lo;
       for (const nt of mot.notes) {
@@ -835,7 +884,7 @@ export class Track {
         const pcs = ch.pcs.map((x) => mod12(x + d.tonic));
         const list = [];
         for (let mm = lo; mm < lo + 26; mm++) if (pcs.includes(mod12(mm))) list.push(mm);
-        const mm = list[clamp(nt.i, 0, list.length - 1)];
+        const mm = list[clamp(nt.i + (seg.shift ?? 0), 0, list.length - 1)];
         this.playLead(C[who].input, L, T(s) + H(), mm, nt.len * s16, nt.v * (0.85 + 0.15 * r.f()));
         ak.emit('note', { t: T(s), m: mm, v: nt.v, who, seed: d.seed });
       }
