@@ -1,8 +1,8 @@
 // Besteci: parça tasarlar, ölçü ölçü çalar, DJ gibi parçadan parçaya geçer.
-import { Rng, hash, newSeed } from './rng.js?v=1792993306';
-import { MODES, modeWeights, diatonicChord, SHAPES, PROGS_MINOR, PROGS_MAJOR, PLANING, voiceChord, camelot } from './kuram.js?v=1792993306';
-import { renderKit } from './sesler.js?v=1792993306';
-import { trackName } from './adlar.js?v=1792993306';
+import { Rng, hash, newSeed } from './rng.js?v=1793007630';
+import { MODES, modeWeights, diatonicChord, SHAPES, PROGS_MINOR, PROGS_MAJOR, PLANING, voiceChord, camelot } from './kuram.js?v=1793007630';
+import { renderKit } from './sesler.js?v=1793007630';
+import { trackName } from './adlar.js?v=1793007630';
 
 const lerp = (a, b, x) => a + (b - a) * x;
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -395,8 +395,8 @@ export function designTrack(seed, c) {
 
   // akış: ilk parça dışında hiçbiri sıfırdan başlamaz; önceki parçayla 32 ölçü boyunca katman katman harmanlanır
   const flow = !!c.prev;
-  const introBars = flow ? 32 : style === 'ambient' ? 16 : r.pick([16, 32]);
-  const outroBars = 32;
+  const introBars = flow ? 16 : style === 'ambient' ? 16 : r.pick([16, 32]);
+  const outroBars = 16;
   const segs = arrange(r, { layers, introBars, outroBars, style, energy: E, flow });
 
   const fx = {
@@ -663,9 +663,10 @@ export class Track {
     const st = new Set(last.sec === 'break' ? this.segs.find((x) => x.sec === 'b')?.on || last.on : last.on);
     for (const l of ['kick', 'hatO', 'clap', 'bass', 'chords']) if (this.d.layers.has(l)) st.add(l);
     let start = fromBar;
-    for (let i = 0; i < outLen / 8; i++) {
-      kept.push({ start, len: 8, sec: 'outro', on: new Set(st), alt: new Set(), fill: null, index: kept.length });
-      start += 8;
+    for (let left = outLen; left > 0; left -= 8) {
+      const len = Math.min(8, left);
+      kept.push({ start, len, sec: 'outro', on: new Set(st), alt: new Set(), fill: null, index: kept.length });
+      start += len;
     }
     this.segs = kept;
     this.len = start;
@@ -675,9 +676,10 @@ export class Track {
   // Geçiş gecikirse çıkışı uzat
   extend(bars) {
     const last = this.segs[this.segs.length - 1];
-    for (let i = 0; i < bars / 8; i++) {
-      this.segs.push({ ...last, start: this.len, len: 8, index: this.segs.length, on: new Set(last.on), alt: new Set() });
-      this.len += 8;
+    for (let left = bars; left > 0; left -= 8) {
+      const len = Math.min(8, left);
+      this.segs.push({ ...last, start: this.len, len, index: this.segs.length, on: new Set(last.on), alt: new Set() });
+      this.len += len;
     }
   }
 
@@ -943,11 +945,11 @@ export class Track {
 // Devir sırası: [kanallar, başlangıç, bitiş (geçişin oranı olarak), doğrusal mı]
 // Önce perküsyon, sonra hi-hat ve pad; armoni (akor, bas, melodi) tek ölçüde birlikte, en son kick.
 const HANDOFF = [
-  [['perc1', 'perc2', 'shaker', 'ride'], 0, 0.3, false],
-  [['hatO', 'hatC'], 0.22, 0.42, false],
-  [['pad', 'fx'], 0.3, 0.62, false],
-  [['chords', 'bass', 'lead', 'lead2', 'vox'], 0.5, 0.54, true],
-  [['kick', 'clap', 'snare'], 0.6, 0.7, false],
+  [['perc1', 'perc2', 'shaker', 'ride'], 0, 0.25, false],
+  [['hatO', 'hatC'], 0.1, 0.3, false],
+  [['pad', 'fx'], 0.15, 0.4, false],
+  [['chords', 'bass', 'lead', 'lead2', 'vox'], 0.3, 0.36, true],
+  [['kick', 'clap', 'snare'], 0.4, 0.5, false],
 ];
 
 // ---------- Akış: parçaları sıraya dizer, saati sürer, geçişleri yapar ----------
@@ -1109,7 +1111,7 @@ export class Akis {
         }
       }
       // yankı kuyrukları son çeyrekte söner
-      const f0 = Math.round(ov * 0.75);
+      const f0 = Math.round(ov * 0.55);
       if (k >= f0) A.bus.out.gain.setTargetAtTime(lerp(1, 0, (k - f0 + 1) / (ov - f0)), t, BAR / 2);
     }
     for (const tr of act) {
@@ -1153,8 +1155,8 @@ export class Akis {
       tr.overlapIn = ov;
       for (const [names] of HANDOFF) for (const n of names) if (tr.ch[n]) tr.ch[n].input.gain.value = 0;
       let start = cur.startBar + cur.len - ov;
-      if (start < this.bar + 1) {
-        const extra = Math.ceil((this.bar + 2 - start) / 8) * 8;
+      if (start < this.bar) {
+        const extra = this.bar - start;
         cur.extend(extra);
         start += extra;
       }
@@ -1174,14 +1176,25 @@ export class Akis {
     save('sh-gecmis', this.history);
   }
 
-  // Sonraki parçaya geç: çıkış en yakın 4 ölçülük sınırda başlar
-  skip(quick = false) {
-    const cur = this.tracks[this.tracks.length - 1];
+  // Sonraki parçaya geç: yeni parça birkaç saniyede gelir
+  skip() {
+    let cur = this.tracks[this.tracks.length - 1];
     if (!cur || this.preparing) return false;
+    if (cur.startBar > this.bar + 1 && this.tracks.length > 1) {
+      // sıradaki parça hazır bekliyor: onu öne çek
+      const q = cur;
+      cur = this.tracks[this.tracks.length - 2];
+      const from = this.bar - cur.startBar;
+      if (cur.startBar + cur.len - 4 <= this.bar) return false;
+      cur.forceOutro(from, 4);
+      q.overlapIn = 4;
+      q.startBar = cur.startBar + cur.len - 4;
+      this.emit('queued', q);
+      return true;
+    }
     const rel = this.bar - cur.startBar;
     if (cur.overlapIn && rel < cur.overlapIn) return false; // geçiş zaten sürüyor
-    const from = Math.ceil((rel + 2) / 4) * 4;
-    cur.forceOutro(from, quick ? 16 : 24);
+    cur.forceOutro(rel, 4);
     this.prepareNext(cur);
     return true;
   }
