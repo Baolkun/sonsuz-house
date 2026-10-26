@@ -1,7 +1,8 @@
 // Arayüz: düğmeler, kaydırıcılar, hazır ayarlar, medya tuşları, uyku zamanlayıcı, görsel arka plan.
-import { Motor } from './motor.js';
-import { Akis } from './besteci.js';
-import { keyName } from './kuram.js';
+import { Motor } from './motor.js?v=1792987268';
+import { Akis } from './besteci.js?v=1792987268';
+import { keyName } from './kuram.js?v=1792987268';
+import { Gorsel, trackColors } from './gorsel.js?v=1792987268';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -334,7 +335,10 @@ function artwork(d) {
   const c = document.createElement('canvas');
   c.width = c.height = 256;
   const g = c.getContext('2d');
-  const [a, b] = colorsFor(d);
+  const css = (c) => `rgb(${c.map((x) => Math.round(x * 255)).join(',')})`;
+  const [, a0, b0] = trackColors(d);
+  const a = css(a0);
+  const b = css(b0);
   const gr = g.createLinearGradient(0, 0, 256, 256);
   gr.addColorStop(0, a);
   gr.addColorStop(1, b);
@@ -383,7 +387,8 @@ async function begin() {
   akis.on('queued', (tr) => {
     $('sonraki').textContent = `${t('next')}: ${tr.d.name[S.lang]}`;
   });
-  akis.on('bar', ({ BAR }) => palette.beat(BAR));
+  for (const ev of ['kick', 'note', 'chord']) akis.on(ev, (e) => gorsel.push(ev, e));
+  akis.on('bar', () => (gorsel.energy = live.energy));
   await akis.start();
   if (S.amb !== 'yok') motor.setAmbience(S.amb, S.ambLevel);
   playing = true;
@@ -392,6 +397,7 @@ async function begin() {
   $('cal').classList.remove('durdu');
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
   wantLock();
+  wake();
 }
 
 async function togglePlay() {
@@ -454,74 +460,22 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// ---------- görsel arka plan: tona ve havaya göre yavaş renk bulutları ----------
-function colorsFor(d) {
-  const hue = (d.tonic * 30 + 20) % 360;
-  const light = d.style === 'ambient' ? 0.9 : 1;
-  const warm = MODE_WARM[d.mode] ?? 0.5;
-  const h2 = (hue + 40 + warm * 50) % 360;
-  return [`hsl(${hue} ${45 + warm * 20}% ${30 * light}%)`, `hsl(${h2} ${40 + warm * 25}% ${22 * light}%)`, hue, h2, warm];
-}
-const MODE_WARM = { phrygian: 0.1, aeolian: 0.3, dorian: 0.5, mixolydian: 0.65, ionian: 0.8, lydian: 0.95 };
+// ---------- görsel arka plan ----------
+const gorsel = new Gorsel($('bg'), motor);
+if (!gorsel.ok) document.body.classList.add('duz');
+const palette = { to: (d) => gorsel.setTrack(d) };
+window.sonsuz = { gorsel, motor, get akis() { return akis; } };
 
-const palette = (() => {
-  const cv = $('bg');
-  const g = cv.getContext('2d');
-  let W = 0;
-  let H = 0;
-  let cur = { h1: 25, h2: 340, s: 45, l: 0.2 };
-  let tgt = { ...cur };
-  let pulse = 0;
-  const blobs = Array.from({ length: 4 }, (_, i) => ({ x: Math.random(), y: Math.random(), r: 0.35 + Math.random() * 0.3, sx: 0.00003 + Math.random() * 0.00005, sy: 0.00003 + Math.random() * 0.00005, ph: Math.random() * 6, k: i }));
-  function resize() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    W = cv.width = Math.round(innerWidth * dpr * 0.5);
-    H = cv.height = Math.round(innerHeight * dpr * 0.5);
-  }
-  addEventListener('resize', resize);
-  resize();
-  const buf = new Uint8Array(64);
-  let last = 0;
-  function frame(now) {
-    requestAnimationFrame(frame);
-    if (now - last < 50) return; // 20 kare/sn yeter, işlemciyi yormasın
-    last = now;
-    for (const k of ['h1', 'h2', 's', 'l']) {
-      let dlt = tgt[k] - cur[k];
-      if (k[0] === 'h') dlt = ((dlt + 540) % 360) - 180;
-      cur[k] += dlt * 0.01;
-    }
-    if (motor.an && playing) {
-      motor.an.getByteFrequencyData(buf);
-      const low = (buf[1] + buf[2] + buf[3]) / 765;
-      pulse += (low - pulse) * 0.2;
-    }
-    g.fillStyle = '#14110f';
-    g.fillRect(0, 0, W, H);
-    g.globalCompositeOperation = 'lighter';
-    for (const b of blobs) {
-      const x = (0.5 + 0.45 * Math.sin(now * b.sx + b.ph)) * W;
-      const y = (0.5 + 0.45 * Math.cos(now * b.sy + b.ph * 1.3)) * H;
-      const r = b.r * Math.max(W, H) * (1 + pulse * 0.06);
-      const hue = b.k % 2 ? cur.h2 : cur.h1;
-      const gr = g.createRadialGradient(x, y, 0, x, y, r);
-      const a = (0.32 + pulse * 0.08) * (b.k > 1 ? 0.6 : 1);
-      gr.addColorStop(0, `hsla(${hue} ${cur.s}% ${cur.l * 100 + 15}% / ${a})`);
-      gr.addColorStop(1, `hsla(${hue} ${cur.s}% 10% / 0)`);
-      g.fillStyle = gr;
-      g.fillRect(0, 0, W, H);
-    }
-    g.globalCompositeOperation = 'source-over';
-  }
-  requestAnimationFrame(frame);
-  return {
-    to(d) {
-      const [, , h1, h2, warm] = colorsFor(d);
-      tgt = { h1, h2, s: 35 + warm * 25, l: d.style === 'ambient' ? 0.14 : 0.2 + live.energy * 0.08 };
-    },
-    beat() {},
-  };
-})();
+// ---------- boşta kalınca arayüz söner, görsel öne çıkar ----------
+let idleT = 0;
+function wake() {
+  document.body.classList.remove('sakin');
+  clearTimeout(idleT);
+  idleT = setTimeout(() => {
+    if (playing && $('ayarlar').hidden) document.body.classList.add('sakin');
+  }, 8000);
+}
+for (const ev of ['mousemove', 'mousedown', 'keydown', 'wheel', 'touchstart']) addEventListener(ev, wake, { passive: true });
 
 // ---------- başlangıç ----------
 setRange($('ses'), S.vol);

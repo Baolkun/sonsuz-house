@@ -113,3 +113,13 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border: 0; bord
   .kaydiricilar { grid-template-columns: 1fr; }
   .kontrol { gap: 8px; }
 }
+
+/* boşta: arayüz söner */
+.ana, .bas, .kontrol, .kaydiricilar, .hazir, .ipucu, .bilgi, .sonraki, .tur { transition: opacity 1.6s ease; }
+body.sakin { cursor: none; }
+body.sakin .bas, body.sakin .kontrol, body.sakin .kaydiricilar, body.sakin .hazir, body.sakin .ipucu, body.sakin .sonraki { opacity: 0; pointer-events: none; }
+body.sakin .bilgi, body.sakin .tur { opacity: .5; }
+body.sakin .ad { opacity: .85; }
+.ad, .bilgi, .tur { text-shadow: 0 2px 30px rgba(0,0,0,.45); }
+body.duz { background: radial-gradient(ellipse at 30% 20%, #3a2620, #14110f 70%); }
+body.sakin .ad.soluk { opacity: 0; }

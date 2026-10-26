@@ -683,6 +683,7 @@ export class Track {
       for (const [s, v] of hits(pat)) {
         const t = T(s);
         hit(C.kick, kit.kick, t, v * (0.92 + 0.08 * r.f()));
+        if (v > 0.5) ak.emit('kick', { t, v, seed: d.seed });
         if (v > 0.5) pump(t);
       }
     }
@@ -772,6 +773,13 @@ export class Track {
       }
     }
 
+    // görsel için akor değişimleri
+    for (const h of [0, 1]) {
+      const ci = this.chordIndex(b, h);
+      if (ci !== this.lastCi) ak.emit('chord', { t: t0 + (h * BAR) / 2, i: ci, seed: d.seed });
+      this.lastCi = ci;
+    }
+
     // ---- akorlar ----
     if (on('chords')) {
       const pat = d.chordRhythm[seg.alt.has('chords') ? 1 : 0];
@@ -818,6 +826,7 @@ export class Track {
         for (let mm = lo; mm < lo + 26; mm++) if (pcs.includes(mod12(mm))) list.push(mm);
         const mm = list[clamp(nt.i, 0, list.length - 1)];
         this.playLead(C[who].input, L, T(s) + H(), mm, nt.len * s16, nt.v * (0.85 + 0.15 * r.f()));
+        ak.emit('note', { t: T(s), m: mm, v: nt.v, who, seed: d.seed });
       }
     }
     if (on('vox')) {
@@ -828,6 +837,7 @@ export class Track {
           const v = H2.voicing[ci];
           const mm = v[v.length - 1 - (nt.s % 3 === 0 ? 0 : 1)] ?? v[v.length - 1];
           K.vox(C.vox.input, T(nt.s) + H(), mm, s16 * r.range(1.2, 2.2), 0.8, V.p);
+          ak.emit('note', { t: T(nt.s), m: mm, v: 0.6, who: 'vox', seed: d.seed });
         }
       } else {
         for (const h of [0, 1]) {
