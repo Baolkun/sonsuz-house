@@ -253,19 +253,20 @@ export class Gorsel {
   }
 
   setTrack(d) {
-    const cols = trackColors(d);
+    this.leadSeed = d.seed;
+    // geçiş sürerken yeni parça gelirse sahne sıçramaz: bu geçiş bitince sıradakine süzülür
+    if (this.mix > 0) this.pending = d;
+    else this.startScene(d);
+  }
+
+  startScene(d) {
+    this.pending = null;
     let next = Math.abs(d.seed) % 5;
     if (d.style === 'ambient') next = [1, 2, 3][d.seed % 3];
     if (next === this.sceneA) next = (next + 1 + (d.seed % 4)) % 5;
-    if (this.mix > 0) {
-      // önceki geçiş bitmeden yenisi gelirse oradan devam
-      this.sceneA = this.sceneB;
-      this.colA = this.colB;
-    }
     this.sceneB = next;
-    this.colB = cols;
+    this.colB = trackColors(d);
     this.mix = 0.0001;
-    this.leadSeed = d.seed;
   }
 
   frame(now) {
@@ -319,6 +320,7 @@ export class Gorsel {
         this.mix = 0;
         this.sceneA = this.sceneB;
         this.colA = this.colB;
+        if (this.pending) this.startScene(this.pending);
       }
     }
     for (const r of this.rips) r.age += sec;
